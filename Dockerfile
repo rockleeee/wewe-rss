@@ -2,11 +2,12 @@ FROM node:20.16.0-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-# Add registry configuration
+# First install pnpm
+RUN npm i -g pnpm
+
+# Then configure registries
 RUN npm config set registry https://registry.npmmirror.com
 RUN pnpm config set registry https://registry.npmmirror.com
-
-RUN npm i -g pnpm
 
 FROM base AS build
 COPY . /usr/src/app
