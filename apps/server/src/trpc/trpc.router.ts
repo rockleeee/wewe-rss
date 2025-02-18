@@ -359,6 +359,44 @@ export class TrpcRouter {
         await this.prismaService.article.delete({ where: { id } });
         return id;
       }),
+
+    summarize: this.trpcService.protectedProcedure
+      .input(
+        z.object({
+          id: z.string(),
+          url: z.string(),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        try {
+          // 使用完整 URL 获取内容
+          const content = await this.trpcService.getMpArticleContent(input.url);
+          
+          this.logger.log(`文章内容获取成功，长度: ${content.length}`);
+          this.logger.log(`内容预览: ${content.slice(0, 200)}...`);
+          
+          
+          // 2. 调用 AI 总结 (暂时注释)
+          const summary = await this.trpcService.generateSummary(content);
+          
+          // 3. 更新数据库 (暂时注释)
+          const article = await this.prismaService.article.update({
+            where: { id: input.id },
+            data: {
+              summary,
+              hasSummary: true,
+            },
+          });
+          
+          return article;
+        } catch (err: any) {
+          this.logger.error('获取文章内容失败:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `获取文章内容失败: ${err.message}`,
+          });
+        }
+      }),
   });
 
   platformRouter = this.trpcService.router({

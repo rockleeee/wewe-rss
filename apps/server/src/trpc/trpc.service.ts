@@ -46,7 +46,7 @@ export class TrpcService {
         'feed',
       )!.updateDelayTime;
 
-    this.request = Axios.create({ baseURL: url, timeout: 15 * 1e3 });
+    this.request = Axios.create({ baseURL: url, timeout: 30 * 1e3 });
 
     this.request.interceptors.response.use(
       (response) => {
@@ -362,5 +362,83 @@ export class TrpcService {
         username?: string;
       }>(`/api/v2/login/platform/${id}`, { timeout: 120 * 1e3 })
       .then((res) => res.data);
+  }
+
+  async getMpArticleContent(url: string): Promise<string> {
+    try {
+      const account = await this.getAvailableAccount();
+      
+      this.logger.log(`开始获取文章内容，URL: ${url}`);
+      
+      // 直接请求文章 URL
+      const response = await this.request
+        .get(url, {
+          headers: {
+            xid: account.id,
+            Authorization: `Bearer ${account.token}`,
+            // 添加一些必要的请求头
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          },
+        });
+
+      if (!response.data) {
+        throw new Error('获取文章内容失败');
+      }
+
+      // 提取文章正文内容
+      const content = response.data
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // 移除 script 标签
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')   // 移除 style 标签
+        .replace(/<[^>]+>/g, '')  // 移除其他 HTML 标签
+        .replace(/\s+/g, ' ')     // 规范化空白字符
+        .trim();                  // 移除首尾空白
+
+      this.logger.log(`获取文章内容成功，长度: ${content.length}`);
+      
+      return content;
+
+    } catch (err: any) {
+      this.logger.error(`获取文章内容失败: ${url}`, err);
+      throw new Error(`获取文章内容失败: ${err.message}`);
+    }
+  }
+
+  async generateSummary(content: string): Promise<string> {
+    try {
+      this.logger.log('开始生成文章摘要，内容长度:', content.length);
+
+      // 调用 AI 服务生成摘要，单独覆盖超时时间为 30 秒（30000 毫秒）
+      const response = await this.request.post<{
+        id: string;
+        answer: string;
+        created_at: number;
+      }>('http://43.138.204.93/v1/completion-messages', {
+        inputs: {
+          query: content  // 直接使用文章内容作为查询
+        },
+        response_mode: "blocking",
+        user: "wewe-rss"
+      }, {
+        timeout: 120 * 1e3, // 单独设置超时时间
+        headers: {
+          'Authorization': `Bearer app-ZdcukynDEevsoXEUsPg24jRJ`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.data.answer) {
+        throw new Error('生成摘要失败：AI 服务未返回内容');
+      }
+
+      const summary = response.data.answer.trim();
+      this.logger.log('摘要生成成功，长度:', summary.length);
+
+      return summary;
+
+    } catch (err: any) {
+      this.logger.error('生成摘要失败:', err);
+      throw new Error(`生成摘要失败: ${err.message}`);
+    }
   }
 }
