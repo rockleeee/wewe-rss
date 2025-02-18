@@ -22,9 +22,10 @@ interface ArticleItem {
   id: string;
   title: string;
   publishTime: number;
-  summary?: string;
+  summary: string | null;
   hasSummary: boolean;
   isGenerating?: boolean;
+  isSyncDB: boolean;
 }
 
 const ArticleList: FC = () => {
