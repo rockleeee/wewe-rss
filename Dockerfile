@@ -2,6 +2,8 @@ FROM node:20.16.0-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
+RUN npm config set registry https://registry.npmmirror.com
+
 RUN npm i -g pnpm
 
 FROM base AS build
